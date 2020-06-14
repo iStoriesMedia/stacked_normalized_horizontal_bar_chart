@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+
+    <link rel="stylesheet" type="text/css" href="css.css"/>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.4.13/d3.min.js"></script>
+
+
+<body>
+
+<div id="figure"></div>
+
+<script>
+  var margin = {top: 80, right: 20, bottom: 180, left: 100},
+    width = 950 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom;
+
+  var y = d3.scale.ordinal()
+    .rangeRoundBands([0, height], .18);
+
+  var x = d3.scale.linear()
+      .rangeRound([0, width], 0.9 );
+  var formater= d3.format(",.1%")
+
+  var color = d3.scale.ordinal()
+
+      .range([ '#6e788a','#a2acbf','#ccaaa9','#d78280','#d8d8d8']);
+
+  var xAxis = d3.svg.axis()
+      .scale(x)
+      .orient("top")
+      .innerTickSize(height-15)
+      .outerTickSize(0)
+      .tickPadding(5)
+      .ticks(2)
+      .tickFormat(function(d) {
+           { return d+"%"}
+      });
+
+  var yAxis = d3.svg.axis()
+      .scale(y)
+      .orient("left");
+
+
+  var tooltip = d3.select("body").append("div").attr("class", "toolTip");
+
+  var widthValue = width + margin.left + margin.right
+  var heightValue = height + margin.top + margin.bottom
+
+var svg = d3.select("#figure").append("svg")
+    .attr("viewBox", `0 0 ${widthValue} ${heightValue}`)
+    .attr("id", "d3-plot")
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    color.domain(["предупреждение", "0 - 1 000 руб.", "1 000 - 10 000 руб.", "10 000 - 50 000 руб.", "данные изъяты"]);
+    d3.csv("data.csv", function(error, data) {
+
+  data.forEach(function(d) {
+
+    d["предупреждение"] = +d[1]*100/d.N;
+    d["0 - 1 000 руб."] = +d[2]*100/d.N;
+    d["1 000 - 10 000 руб."] = +d[3]*100/d.N;
+    d["10 000 - 50 000 руб."] = +d[4]*100/d.N;
+    d["данные изъяты"] = +d[5]*100/d.N;
+    var x0 = 0;
+    var idx = 0;
+
+    d.boxes = color.domain().map(function(name) { return {name: name, x0: x0, x1: x0 += +d[name], N: +d.N, n: +d[idx += 1]}; })
+  });
+
+
+  var min_val = d3.min(data, function(d) {
+          return d.boxes["0"].x0;
+          });
+
+  var max_val = d3.max(data, function(d) {
+          return d.boxes["4"].x1;
+          });
+
+  x.domain([min_val, max_val]).nice();
+  y.domain(data.map(function(d) { return d.name; }));
+
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", `translate(0,${height-15 })`)
+      .call(xAxis);
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis);
+
+  var tooltip = d3.select("body").append("div").attr("class", "toolTip");
+
+  var vakken = svg.selectAll(".stat")
+      .data(data)
+    .enter().append("g")
+      .attr("class", "bar")
+
+      .attr("transform", function(d) { return "translate(0," + y(d.name) + ")"; })
+      .on("mouseover", function(d) {
+        svg.selectAll('.y').selectAll('text').filter(function(text) { return text===d.name; })
+            .transition().duration(100).style('font','18px Proto Grotesk');
+      })
+      .on("mouseout", function(d) {
+        svg.selectAll('.y').selectAll('text').filter(function(text) { return text===d.name; })
+            .transition().duration(100).style('font','15px Proto Grotesk');
+      });
+
+
+  var bars = vakken.selectAll("rect")
+      .data(function(d) { return d.boxes; })
+    .enter().append("g").attr("class", "subbar")
+    .on("mousemove", function(d) {
+
+      tooltip
+              .style("left", d3.event.pageX - 50 + "px")
+              .style("top", d3.event.pageY - 30 + "px")
+              .style("display", "inline-block")
+
+              .html((formater(d.n/d.N)));
+
+      d3.select(this).style('opacity', 0.8);
+      d3.select(this).style("stroke", '#676767');
+
+
+    })
+
+
+      .on('mouseout', function(d) {
+        tooltip.style("display", "none");
+          d3.select(this).style('opacity', 1);
+          d3.select(this).style("stroke", "none");})
+
+
+  svg.append("text")
+        .attr("x", margin.left-150)
+        .attr("y", 0 - (margin.top-50 / 2))
+        .style("font-size", "25px")
+        .style("fill", "#676767")
+        .text("«Строгость» российских судов в зависимости от региона");
+
+  svg.append("text")
+        .attr("x", margin.left-150)
+        .attr("y", 0 - (margin.top-105 / 2))
+        .style("font-size", "16px")
+        .style("fill", "#9a9a9a")
+        .text("Наказания, вынесенные гражданам по 20.6.1 КоАП за апрель и май 2020 г.");
+
+
+  svg.append("text")
+        .attr("x", margin.left-160)
+        .attr("y", 0 - (margin.top-460))
+        .style("font-size", "17px")
+        .style("fill", "#9a9a9a")
+        .text("* ТОП-20 регионов по количеству вынесенных наказаний (без ИП, должностных и юр. лиц) на 1 млн чел.");
+
+  svg.append("text")
+        .attr("x", margin.left-150)
+        .attr("y", 0 - (margin.top-500))
+        .style("font-size", "17px")
+        .style("fill", "#9a9a9a")
+        .text("Важные истории, Холод, 2020");
+
+  svg.append("text")
+        .attr("x", margin.left-150)
+        .attr("y", 0 - (margin.top-520))
+        .style("font-size", "17px")
+        .style("fill", "#9a9a9a")
+        .text("Данные: постановления районных, городских и гарнизонных судов");
+
+  bars.append("rect")
+      .attr("height", y.rangeBand()+"px")
+      .attr("x", function(d) { return x(d.x0); })
+      .attr("width", function(d) { return x(d.x1) - x(d.x0)+"px"; })
+      .style("fill", function(d) { return color(d.name); })
+
+
+  vakken.insert("rect",":first-child")
+      .attr("height", y.rangeBand())
+      .attr("x", "1")
+      .attr("width", width)
+      .attr("fill-opacity", "0")
+      .style("fill", "#F5F5F5")
+      .attr("class", function(d,index) { return index%2==0 ? "even" : "uneven"; });
+
+  svg.append("g")
+      .attr("class", "y axis")
+  .append("line")
+      .attr("transform", `translate(0,0)`)
+      .attr("x1", x(0))
+      .attr("x2", x(0))
+      .attr("y2", height);
+
+  var startp = svg.append("g").attr("class", "legendbox").attr("id", "mylegendbox");
+
+  var legend_tabs = [0, 150, 275, 435, 610];
+  var legend = startp.selectAll(".legend")
+      .data(color.domain().slice())
+    .enter().append("g")
+      .attr("class", "legend")
+      .attr("transform", function(d, i) { return "translate(" + legend_tabs[i] + ",-25)"; });
+
+  legend.append("rect")
+      .attr("x", 0)
+      .attr("width", 18)
+      .attr("height", 18)
+      .style("fill", color);
+
+
+  legend.append("text")
+      .attr("x", 22)
+      .attr("y", 9)
+      .attr("dy", ".35em")
+      .style("text-anchor", "begin")
+      .style("font" ,"13px Proto Grotesk")
+      .text(function(d) { return d; });
+
+
+d3.selectAll(".axis path")
+      .style("fill", "none")
+      .style("stroke", "none")
+      .style("shape-rendering", "crispEdges")
+
+
+  var movesize = height - startp.node().getBBox().height+40;
+  d3.selectAll(".legendbox").attr("transform", "translate(0, " + movesize  + ")");
+
+
+});
+</script>
+
+</body>
+</html>
